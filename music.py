@@ -50,10 +50,6 @@ class Music(commands.Cog):
             url = pafy.new(song).getbestaudio().url
             source = await discord.FFmpegOpusAudio.from_probe(url, **FFMPEG_OPTIONS)
             ctx.voice_client.play(source, after=lambda error: self.client.loop.create_task(self.check_queue(ctx)))
-            """
-            # ctx.voice_client.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url)), after=lambda error: self.client.loop.create_task(self.check_queue(ctx)))
-            # ctx.voice_client.source.volume = 0.8
-            """
             return True
         except OSError as e:
             await ctx.send("There was an error playing the current song. Skipping")
@@ -64,7 +60,7 @@ class Music(commands.Cog):
     @commands.command(help="causes the bot to join the channel you are currently in")
     async def join(self, ctx):
         if ctx.author.voice is None:
-            await ctx.send("You are not in a voice Channel!")
+            return await ctx.send("You are not in a voice Channel!")
 
         voice_channel = ctx.author.voice.channel
         if ctx.voice_client is None:
@@ -74,48 +70,36 @@ class Music(commands.Cog):
 
     @commands.command(help="disconnects the bot from the voice channel")
     async def disconnect(self, ctx):
+        if ctx.voice_client is None:
+            return
+
+        if ctx.author.voice is None or ctx.author.voice.channel.id != ctx.voice_client.channel.id:
+            return
+
         if ctx.voice_client is not None:
             self.song_queue[ctx.guild.id] = []
             await ctx.voice_client.disconnect()
 
-    """
-    @commands.command(help="stops the audio")
-    async def stop(self, ctx):
-        if ctx.voice_client is not None:
-            ctx.voice_client.stop()
-            await ctx.send("Stop ⏹")
-    
-    @commands.command(name="p", help="plays the audio of the youtube video at the given URL")
-    async def play(self, ctx, url):
-        if ctx.voice_client is not None:
-            ctx.voice_client.stop()
-
-        if ctx.author.voice is None:
-            await ctx.send("You are not connected to a voice channel.")
-            return
-
-        FFMPEG_OPTIONS = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", "options": "-vn"}
-        YDL_OPTIONS = {"format": "bestaudio",
-                       "quiet": True
-        }
-        vc = ctx.voice_client
-
-        with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
-            info = ydl.extract_info(url, download=False)
-            url2 = info["formats"][0]["url"]
-            source = await discord.FFmpegOpusAudio.from_probe(url2, **FFMPEG_OPTIONS)
-            vc.play(source)
-            await ctx.send(f"Playing ▶ {info.get('title')} by {info.get('artist')}")
-    """
-
     @commands.command(help="Pauses the audio. type !resume to pick up where the audio left off.")
     async def pause(self, ctx):
+        if ctx.voice_client is None:
+            return
+
+        if ctx.author.voice is None or ctx.author.voice.channel.id != ctx.voice_client.channel.id:
+            return
+
         if ctx.voice_client is not None:
             ctx.voice_client.pause()
             await ctx.send("Paused ⏸️")
 
     @commands.command(help="Resumes audio at the spot left off by the previous !pause command")
     async def resume(self, ctx):
+        if ctx.voice_client is None:
+            return
+
+        if ctx.author.voice is None or ctx.author.voice.channel.id != ctx.voice_client.channel.id:
+            return
+
         if ctx.voice_client is not None:
             ctx.voice_client.resume()
             await ctx.send("Resume ▶️")
@@ -129,6 +113,9 @@ class Music(commands.Cog):
 
         if ctx.voice_client is None:
             return await ctx.send("I must be in a voice channel to play a song")
+
+        if ctx.author.voice is None or ctx.author.voice.channel.id != ctx.voice_client.channel.id:
+            return
 
         # handle song when song isn't a url
         if not ("youtube.com/watch" in song or "https://youtu.be" in song):
@@ -161,7 +148,6 @@ class Music(commands.Cog):
         i = 1
         for url in self.song_queue[ctx.guild.id]:
             embed.description += f"{i}) {url}\n"
-
             i += 1
 
         embed.set_footer(text="End of song queue.")
@@ -206,7 +192,6 @@ class Music(commands.Cog):
                     # make sure the user that reacted is in the voice channel, hasn't already had their vote counted, and isn't the bot
                     if user.voice.channel.id == ctx.voice_client.channel.id and user.id not in reacted and not user.bot:
                         votes[reaction.emoji] += 1
-
                         reacted.append(user.id)
 
         skip_song = False
