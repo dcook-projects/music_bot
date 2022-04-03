@@ -5,6 +5,10 @@ import pafy
 import asyncio
 
 
+def check_if_bot_author(ctx):
+    return ctx.message.author.id == 149795176741601280
+
+
 class Music(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -55,6 +59,26 @@ class Music(commands.Cog):
             await ctx.send("There was an error playing the current song. Skipping")
             return False
 
+    """---------------------------------LISTENERS---------------------------------------------------"""
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        INACTIVITY_TIME_LIMIT = 900
+        if not member.id == self.client.user.id:
+            return
+        elif before.channel is None:
+            voice = after.channel.guild.voice_client
+            time = 0
+            while True:
+                await asyncio.sleep(1)
+                time = time + 1
+                if voice.is_playing() and not voice.is_paused():
+                    time = 0
+                if time == INACTIVITY_TIME_LIMIT:
+                    await voice.disconnect()
+                if not voice.is_connected():
+                    break
+
     """--------------------------------COMMANDS-----------------------------------------------------"""
 
     @commands.command(help="causes the bot to join the channel you are currently in")
@@ -68,12 +92,10 @@ class Music(commands.Cog):
         else:
             await ctx.voice_client.move_to(voice_channel)
 
-    @commands.command(help="disconnects the bot from the voice channel")
+    @commands.command(help="Bot author command only. Disconnects the bot from the voice channel")
+    @commands.check(check_if_bot_author)
     async def disconnect(self, ctx):
         if ctx.voice_client is None:
-            return
-
-        if ctx.author.voice is None or ctx.author.voice.channel.id != ctx.voice_client.channel.id:
             return
 
         if ctx.voice_client is not None:
